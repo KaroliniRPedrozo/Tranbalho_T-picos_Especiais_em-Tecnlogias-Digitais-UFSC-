@@ -1,0 +1,14 @@
+# Binarios
+/bin/
+*.exe
+
+# Go
+vendor/
+
+# Ambiente
+.env
+
+# Editor
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,59 @@
+services:
+  # Banco exclusivo do events-service. Na fase 2 cada microsservico ganha o
+  # seu proprio container de banco, sem schema compartilhado.
+  events-db:
+    image: postgres:16-alpine
+    container_name: ticketing-events-db
+    environment:
+      POSTGRES_USER: events
+      POSTGRES_PASSWORD: events
+      POSTGRES_DB: eventsdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - events-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U events -d eventsdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - ticketing
+
+  events-service:
+    build:
+      context: ./services/events
+      dockerfile: Dockerfile
+    container_name: ticketing-events-service
+    environment:
+      SERVICE_NAME: events-service
+      APP_ENV: development
+      HTTP_PORT: "8080"
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://events:events@events-db:5432/eventsdb?sslmode=disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      events-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - ticketing
+
+  # --- Fase 2 (gRPC) --------------------------------------------------------
+  # tickets-db / tickets-service e payments-service entram aqui. O
+  # events-service vai expor tambem uma porta gRPC interna (nao publicada no
+  # host) e os demais servicos falam com ele por essa rede.
+
+volumes:
+  events-db-data:
+
+networks:
+  ticketing:
+    driver: bridge
