@@ -14,6 +14,7 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
+// RouterDeps reune tudo que o roteador precisa, injetado pelo main.
 type RouterDeps struct {
 	Logger      *slog.Logger
 	EventStore  EventStore
@@ -28,6 +29,7 @@ type RouterDeps struct {
 func NewRouter(deps RouterDeps) http.Handler {
 	r := chi.NewRouter()
 
+	// Middlewares, na ordem: id da requisicao, log de acesso, recuperacao de panic.
 	r.Use(RequestID)
 	r.Use(StructuredLogger(deps.Logger))
 	r.Use(Recoverer)
@@ -54,6 +56,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 		writeJSON(w, r, http.StatusOK, map[string]string{"status": "ready"})
 	})
 
+	// Rotas REST de eventos (CRUD + publicar/cancelar).
 	h := NewEventHandler(deps.EventStore)
 
 	r.Route("/api/v1/events", func(r chi.Router) {
@@ -66,9 +69,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Post("/{id}/cancel", h.Cancel)
 	})
 
+	// Rota de consulta de CEP (usa a API externa ViaCEP).
 	ah := NewAddressHandler(deps.Addresses)
 	r.Get("/api/v1/addresses/{cep}", ah.Get)
 
+	// Respostas padrao para rota inexistente e metodo nao permitido.
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "route_not_found", "rota nao existe", nil)
 	})

@@ -12,6 +12,7 @@ var (
 	ErrInvalidTransition = errors.New("transicao de status invalida")
 )
 
+// Status e o ciclo de vida do evento: rascunho -> publicado -> cancelado.
 type Status string
 
 const (
@@ -20,6 +21,7 @@ const (
 	StatusCancelled Status = "cancelled"
 )
 
+// Valid diz se o texto e um dos tres status conhecidos.
 func (s Status) Valid() bool {
 	switch s {
 	case StatusDraft, StatusPublished, StatusCancelled:
@@ -78,6 +80,7 @@ func (v *ValidationError) Error() string {
 	return "payload invalido: " + strings.Join(keys, ", ")
 }
 
+// Add registra o erro de um campo (um por campo).
 func (v *ValidationError) Add(field, msg string) {
 	if v.Fields == nil {
 		v.Fields = map[string]string{}
@@ -85,6 +88,7 @@ func (v *ValidationError) Add(field, msg string) {
 	v.Fields[field] = msg
 }
 
+// HasErrors diz se algum campo foi reprovado.
 func (v *ValidationError) HasErrors() bool { return len(v.Fields) > 0 }
 
 // EventInput e o payload aceito em POST e PUT.
@@ -98,6 +102,7 @@ type EventInput struct {
 	PriceCents  int64     `json:"price_cents"`
 }
 
+// Normalize remove espacos nas pontas dos textos antes de validar.
 func (in *EventInput) Normalize() {
 	in.Name = strings.TrimSpace(in.Name)
 	in.Description = strings.TrimSpace(in.Description)
@@ -105,9 +110,12 @@ func (in *EventInput) Normalize() {
 	in.City = strings.TrimSpace(in.City)
 }
 
+// Validate aplica as regras de negocio do payload e devolve todos os erros
+// de uma vez (*ValidationError), ou nil se estiver tudo certo.
 func (in EventInput) Validate() error {
 	v := &ValidationError{}
 
+	// Textos: obrigatorios e com tamanho maximo.
 	if in.Name == "" {
 		v.Add("name", "obrigatorio")
 	} else if len(in.Name) > 160 {
@@ -122,11 +130,13 @@ func (in EventInput) Validate() error {
 	if in.City == "" {
 		v.Add("city", "obrigatorio")
 	}
+	// Data: obrigatoria e futura.
 	if in.StartsAt.IsZero() {
 		v.Add("starts_at", "obrigatorio, no formato RFC3339 (ex: 2026-11-20T20:00:00Z)")
 	} else if in.StartsAt.Before(time.Now()) {
 		v.Add("starts_at", "deve ser uma data futura")
 	}
+	// Numeros: capacidade positiva e preco nao negativo.
 	if in.Capacity <= 0 {
 		v.Add("capacity", "deve ser maior que zero")
 	}
@@ -134,6 +144,7 @@ func (in EventInput) Validate() error {
 		v.Add("price_cents", "nao pode ser negativo")
 	}
 
+	// So devolve erro se algum campo foi reprovado.
 	if v.HasErrors() {
 		return v
 	}

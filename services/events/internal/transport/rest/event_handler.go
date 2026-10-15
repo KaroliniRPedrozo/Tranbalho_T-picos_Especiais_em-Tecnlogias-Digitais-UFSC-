@@ -27,14 +27,17 @@ type EventStore interface {
 	Delete(ctx context.Context, id string) error
 }
 
+// EventHandler agrupa os handlers HTTP de /api/v1/events.
 type EventHandler struct {
 	store EventStore
 }
 
+// NewEventHandler cria o handler recebendo o repositorio por interface.
 func NewEventHandler(store EventStore) *EventHandler {
 	return &EventHandler{store: store}
 }
 
+// uuidRe valida o formato do id na URL antes de ir ao banco.
 var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 const (
@@ -43,6 +46,7 @@ const (
 	maxBodyBytes = 1 << 20 // 1 MiB
 )
 
+// Create trata POST /events: valida o corpo, grava e responde 201 + Location.
 func (h *EventHandler) Create(w http.ResponseWriter, r *http.Request) {
 	in, ok := decodeInput(w, r)
 	if !ok {
@@ -64,6 +68,7 @@ func (h *EventHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, r, http.StatusCreated, event)
 }
 
+// List trata GET /events com filtros opcionais (city, status, limit, offset).
 func (h *EventHandler) List(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
@@ -73,6 +78,7 @@ func (h *EventHandler) List(w http.ResponseWriter, r *http.Request) {
 		Offset: 0,
 	}
 
+	// status: so aceita draft, published ou cancelled.
 	if s := q.Get("status"); s != "" {
 		status := domain.Status(s)
 		if !status.Valid() {
@@ -83,6 +89,7 @@ func (h *EventHandler) List(w http.ResponseWriter, r *http.Request) {
 		filter.Status = status
 	}
 
+	// limit: inteiro positivo, limitado a maxLimit.
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 {
@@ -95,6 +102,7 @@ func (h *EventHandler) List(w http.ResponseWriter, r *http.Request) {
 		filter.Limit = n
 	}
 
+	// offset: inteiro nao negativo.
 	if v := q.Get("offset"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 0 {
@@ -113,6 +121,7 @@ func (h *EventHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, r, http.StatusOK, page)
 }
 
+// Get trata GET /events/{id}.
 func (h *EventHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, ok := eventID(w, r)
 	if !ok {
@@ -128,6 +137,7 @@ func (h *EventHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, r, http.StatusOK, event)
 }
 
+// Update trata PUT /events/{id}: valida o id, valida o corpo e atualiza.
 func (h *EventHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, ok := eventID(w, r)
 	if !ok {
@@ -158,6 +168,8 @@ func (h *EventHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	h.transition(w, r, domain.StatusCancelled)
 }
 
+// transition aplica a regra de negocio (CanPublish/CanCancel) e, se permitida,
+// grava o novo status. Regra violada vira 409.
 func (h *EventHandler) transition(w http.ResponseWriter, r *http.Request, target domain.Status) {
 	id, ok := eventID(w, r)
 	if !ok {
@@ -197,6 +209,7 @@ func (h *EventHandler) transition(w http.ResponseWriter, r *http.Request, target
 	writeJSON(w, r, http.StatusOK, event)
 }
 
+// Delete trata DELETE /events/{id} e responde 204 sem corpo.
 func (h *EventHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := eventID(w, r)
 	if !ok {
@@ -226,6 +239,7 @@ func (h *EventHandler) fail(w http.ResponseWriter, r *http.Request, err error) {
 	}
 }
 
+// eventID le o {id} da URL e rejeita com 400 se nao for um UUID.
 func eventID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	id := chi.URLParam(r, "id")
 	if !uuidRe.MatchString(id) {
@@ -235,7 +249,10 @@ func eventID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return id, true
 }
 
+// decodeInput le e valida o JSON do corpo. Em caso de erro ja responde ao
+// cliente (400 ou 422) e devolve ok=false.
 func decodeInput(w http.ResponseWriter, r *http.Request) (domain.EventInput, bool) {
+	// Limita o tamanho do corpo e recusa campos desconhecidos.
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 
 	dec := json.NewDecoder(r.Body)
@@ -251,6 +268,7 @@ func decodeInput(w http.ResponseWriter, r *http.Request) (domain.EventInput, boo
 		return domain.EventInput{}, false
 	}
 
+	// Limpa os textos e aplica as regras de negocio (422 se reprovar).
 	in.Normalize()
 
 	if err := in.Validate(); err != nil {

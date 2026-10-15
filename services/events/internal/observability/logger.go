@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// ctxKey e um tipo proprio para as chaves do contexto, evitando colisao com
+// chaves de outros pacotes.
 type ctxKey string
 
 const (
@@ -35,6 +37,8 @@ func NewLogger(serviceName, env, level string) *slog.Logger {
 	)
 }
 
+// parseLevel converte o texto da configuracao (debug, warn, error) em nivel
+// do slog; qualquer outro valor vira info.
 func parseLevel(level string) slog.Level {
 	switch strings.ToLower(level) {
 	case "debug":
@@ -62,6 +66,7 @@ func LoggerFrom(ctx context.Context) *slog.Logger {
 	return slog.Default()
 }
 
+// WithRequestID guarda o id da requisicao no contexto.
 func WithRequestID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, requestIDKey, id)
 }

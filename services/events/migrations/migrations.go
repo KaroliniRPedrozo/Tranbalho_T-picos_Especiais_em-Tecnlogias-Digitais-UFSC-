@@ -15,6 +15,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// files contem os arquivos .sql embutidos no binario na hora do build.
+//
 //go:embed *.sql
 var files embed.FS
 
@@ -27,6 +29,7 @@ type Executor interface {
 // Apply roda, em ordem lexicografica, toda migration ainda nao registrada em
 // schema_migrations. Rodar duas vezes nao causa efeito nenhum.
 func Apply(ctx context.Context, db Executor, log *slog.Logger) error {
+	// 1. Garante a tabela que registra quais migrations ja rodaram.
 	const createTable = `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version    TEXT PRIMARY KEY,
@@ -36,6 +39,7 @@ func Apply(ctx context.Context, db Executor, log *slog.Logger) error {
 		return fmt.Errorf("criando schema_migrations: %w", err)
 	}
 
+	// 2. Lista os .sql embutidos e ordena pelo nome (0001, 0002...).
 	entries, err := files.ReadDir(".")
 	if err != nil {
 		return fmt.Errorf("lendo migrations embutidas: %w", err)
@@ -49,6 +53,7 @@ func Apply(ctx context.Context, db Executor, log *slog.Logger) error {
 	}
 	sort.Strings(names)
 
+	// 3. Para cada arquivo: pula se ja foi aplicado; senao executa e registra.
 	for _, name := range names {
 		var exists bool
 		row := db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)`, name)

@@ -18,12 +18,15 @@ type EventRepository struct {
 	pool *pgxpool.Pool
 }
 
+// NewEventRepository cria o repositorio sobre um pool de conexoes.
 func NewEventRepository(pool *pgxpool.Pool) *EventRepository {
 	return &EventRepository{pool: pool}
 }
 
+// eventColumns evita repetir a lista de colunas em cada consulta.
 const eventColumns = `id, name, description, venue, city, starts_at, capacity, price_cents, status, created_at, updated_at`
 
+// scanEvent copia uma linha do banco para a struct domain.Event.
 func scanEvent(row pgx.Row) (domain.Event, error) {
 	var e domain.Event
 	err := row.Scan(
@@ -34,6 +37,7 @@ func scanEvent(row pgx.Row) (domain.Event, error) {
 	return e, err
 }
 
+// Create insere um evento e devolve a linha criada (RETURNING).
 func (r *EventRepository) Create(ctx context.Context, in domain.EventInput) (domain.Event, error) {
 	const q = `
 		INSERT INTO events (name, description, venue, city, starts_at, capacity, price_cents)
@@ -49,6 +53,8 @@ func (r *EventRepository) Create(ctx context.Context, in domain.EventInput) (dom
 	return e, nil
 }
 
+// GetByID busca um evento. Linha inexistente vira ErrNotFound (negocio);
+// qualquer outra falha e erro de infraestrutura.
 func (r *EventRepository) GetByID(ctx context.Context, id string) (domain.Event, error) {
 	const q = `SELECT ` + eventColumns + ` FROM events WHERE id = $1`
 
@@ -62,7 +68,10 @@ func (r *EventRepository) GetByID(ctx context.Context, id string) (domain.Event,
 	return e, nil
 }
 
+// List devolve uma pagina de eventos com filtros opcionais de cidade e status.
 func (r *EventRepository) List(ctx context.Context, f domain.ListFilter) (domain.Page, error) {
+	// 1. Monta o WHERE dinamicamente, sempre com parametros ($1, $2...) para
+	// evitar SQL injection.
 	where := []string{"1 = 1"}
 	args := []any{}
 
@@ -76,12 +85,14 @@ func (r *EventRepository) List(ctx context.Context, f domain.ListFilter) (domain
 	}
 	clause := strings.Join(where, " AND ")
 
+	// 2. Conta o total (para a paginacao).
 	var total int64
 	countQ := `SELECT count(*) FROM events WHERE ` + clause
 	if err := r.pool.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
 		return domain.Page{}, fmt.Errorf("contando eventos: %w", err)
 	}
 
+	// 3. Busca so a pagina pedida, ordenada pela data do evento.
 	args = append(args, f.Limit, f.Offset)
 	listQ := fmt.Sprintf(
 		`SELECT %s FROM events WHERE %s ORDER BY starts_at ASC LIMIT $%d OFFSET $%d`,
@@ -94,6 +105,7 @@ func (r *EventRepository) List(ctx context.Context, f domain.ListFilter) (domain
 	}
 	defer rows.Close()
 
+	// 4. Le as linhas uma a uma.
 	items := make([]domain.Event, 0, f.Limit)
 	for rows.Next() {
 		e, err := scanEvent(rows)
@@ -109,6 +121,7 @@ func (r *EventRepository) List(ctx context.Context, f domain.ListFilter) (domain
 	return domain.Page{Items: items, Total: total, Limit: f.Limit, Offset: f.Offset}, nil
 }
 
+// Update troca os dados de um evento; id inexistente vira ErrNotFound.
 func (r *EventRepository) Update(ctx context.Context, id string, in domain.EventInput) (domain.Event, error) {
 	const q = `
 		UPDATE events
@@ -129,6 +142,7 @@ func (r *EventRepository) Update(ctx context.Context, id string, in domain.Event
 	return e, nil
 }
 
+// UpdateStatus muda so o status (publicar/cancelar).
 func (r *EventRepository) UpdateStatus(ctx context.Context, id string, status domain.Status) (domain.Event, error) {
 	const q = `
 		UPDATE events SET status = $2, updated_at = now()
@@ -145,6 +159,7 @@ func (r *EventRepository) UpdateStatus(ctx context.Context, id string, status do
 	return e, nil
 }
 
+// Delete remove o evento; nenhuma linha afetada significa ErrNotFound.
 func (r *EventRepository) Delete(ctx context.Context, id string) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM events WHERE id = $1`, id)
 	if err != nil {
@@ -156,6 +171,7 @@ func (r *EventRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// Ping testa a conexao com o banco; usado pelo /readyz.
 func (r *EventRepository) Ping(ctx context.Context) error {
 	return r.pool.Ping(ctx)
 }

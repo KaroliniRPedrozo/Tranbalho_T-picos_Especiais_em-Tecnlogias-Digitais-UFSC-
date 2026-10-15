@@ -19,6 +19,7 @@ type ErrorBody struct {
 	} `json:"error"`
 }
 
+// writeJSON escreve o status e o corpo em JSON; payload nil envia so o status.
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -32,6 +33,7 @@ func writeJSON(w http.ResponseWriter, r *http.Request, status int, payload any) 
 	}
 }
 
+// writeError monta o envelope de erro padrao, incluindo o request_id.
 func writeError(w http.ResponseWriter, r *http.Request, status int, code, message string, fields map[string]string) {
 	var body ErrorBody
 	body.Error.Code = code

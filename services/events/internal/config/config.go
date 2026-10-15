@@ -21,6 +21,8 @@ type Config struct {
 	ViaCEPTimeout   time.Duration
 }
 
+// Load le as variaveis de ambiente, aplicando um valor padrao quando a
+// variavel nao existe. Apenas DATABASE_URL e obrigatoria.
 func Load() (Config, error) {
 	cfg := Config{
 		ServiceName:     getenv("SERVICE_NAME", "events-service"),
@@ -34,6 +36,7 @@ func Load() (Config, error) {
 		ViaCEPTimeout:   getduration("VIACEP_TIMEOUT", 5*time.Second),
 	}
 
+	// Sem banco o servico nao funciona: falha logo na partida.
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("variavel de ambiente obrigatoria nao definida: DATABASE_URL")
 	}
@@ -41,6 +44,7 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
+// getenv devolve a variavel de ambiente ou o valor padrao se estiver vazia.
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -48,6 +52,7 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
+// getint le um inteiro; se faltar ou for invalido, usa o padrao.
 func getint(key string, fallback int) int {
 	v, err := strconv.Atoi(os.Getenv(key))
 	if err != nil {
@@ -56,6 +61,7 @@ func getint(key string, fallback int) int {
 	return v
 }
 
+// getduration le uma duracao (ex: 5s, 2m); se faltar ou for invalida, usa o padrao.
 func getduration(key string, fallback time.Duration) time.Duration {
 	v, err := time.ParseDuration(os.Getenv(key))
 	if err != nil {

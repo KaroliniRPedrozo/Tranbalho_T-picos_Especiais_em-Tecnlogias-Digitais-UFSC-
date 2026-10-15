@@ -68,27 +68,36 @@ type response struct {
 // Lookup consulta o CEP. O timeout vale para a chamada inteira (conexao,
 // resposta e leitura do corpo) e herda o cancelamento do contexto recebido.
 func (c *Client) Lookup(ctx context.Context, rawCEP string) (Address, error) {
+	// 1. Validacao local: tira a mascara e confere os 8 digitos. Se for
+	// invalido, nem chama a API externa (erro de negocio).
 	cep, err := NormalizeCEP(rawCEP)
 	if err != nil {
 		return Address{}, err
 	}
 
+	// 2. Timeout: limita o tempo total da chamada. O cancel() libera os
+	// recursos do contexto quando a funcao termina.
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
+	// 3. Monta a requisicao GET ja ligada ao contexto (com o timeout).
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/ws/"+cep+"/json/", nil)
 	if err != nil {
 		return Address{}, fmt.Errorf("%w: montando requisicao: %v", ErrUnavailable, err)
 	}
 	req.Header.Set("Accept", "application/json")
 
+	// 4. Envia a requisicao. Falha de rede ou timeout e erro de
+	// infraestrutura (ErrUnavailable).
 	resp, err := c.http.Do(req)
 	if err != nil {
 		// %w duplo: preserva ErrUnavailable e a causa (ex: DeadlineExceeded).
 		return Address{}, fmt.Errorf("%w: %w", ErrUnavailable, err)
 	}
+	// 5. Fecha o corpo da resposta ao sair, para nao vazar conexao.
 	defer resp.Body.Close()
 
+	// 6. Confere o status HTTP antes de assumir sucesso.
 	switch {
 	case resp.StatusCode == http.StatusBadRequest:
 		// O ViaCEP responde 400 para formato de CEP que ele rejeita.
@@ -99,14 +108,17 @@ func (c *Client) Lookup(ctx context.Context, rawCEP string) (Address, error) {
 		return Address{}, fmt.Errorf("%w: status %d", ErrUnavailable, resp.StatusCode)
 	}
 
+	// 7. Le o JSON da resposta. Se vier ilegivel, e erro de infraestrutura.
 	var body response
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return Address{}, fmt.Errorf("%w: resposta ilegivel: %v", ErrUnavailable, err)
 	}
+	// 8. O ViaCEP responde 200 com {"erro": true} quando o CEP nao existe.
 	if body.Erro != nil && body.Erro != false && body.Erro != "false" {
 		return Address{}, ErrCEPNotFound
 	}
 
+	// 9. Traduz os campos do ViaCEP (portugues) para o nosso formato (ingles).
 	return Address{
 		CEP:          body.CEP,
 		Street:       body.Logradouro,

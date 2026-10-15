@@ -10,6 +10,7 @@ import (
 	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/observability"
 )
 
+// headerRequestID e o cabecalho usado para correlacionar requisicao e logs.
 const headerRequestID = "X-Request-ID"
 
 // statusRecorder captura o status code para o log de acesso.
@@ -19,11 +20,13 @@ type statusRecorder struct {
 	bytes  int
 }
 
+// WriteHeader guarda o status antes de repassar a resposta.
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
 }
 
+// Write conta os bytes enviados; sem WriteHeader previo, o status e 200.
 func (r *statusRecorder) Write(b []byte) (int, error) {
 	if r.status == 0 {
 		r.status = http.StatusOK
@@ -53,6 +56,7 @@ func RequestID(next http.Handler) http.Handler {
 func StructuredLogger(base *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Marca o inicio para medir a duracao.
 			start := time.Now()
 
 			reqLog := base.With(
@@ -69,6 +73,7 @@ func StructuredLogger(base *slog.Logger) func(http.Handler) http.Handler {
 				rec.status = http.StatusOK
 			}
 
+			// Campos da linha de log de acesso.
 			attrs := []any{
 				slog.Int("status", rec.status),
 				slog.Int("bytes", rec.bytes),
@@ -77,6 +82,7 @@ func StructuredLogger(base *slog.Logger) func(http.Handler) http.Handler {
 				slog.String("user_agent", r.UserAgent()),
 			}
 
+			// O nivel do log depende do status: 5xx erro, 4xx aviso, resto info.
 			switch {
 			case rec.status >= 500:
 				reqLog.Error("requisicao concluida", attrs...)
@@ -104,6 +110,7 @@ func Recoverer(next http.Handler) http.Handler {
 	})
 }
 
+// newID gera um identificador aleatorio de 24 caracteres hexadecimais.
 func newID() string {
 	b := make([]byte, 12)
 	if _, err := rand.Read(b); err != nil {
