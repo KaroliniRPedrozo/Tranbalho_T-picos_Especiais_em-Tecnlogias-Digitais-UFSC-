@@ -75,8 +75,21 @@ cd services/events && go mod tidy
 make run
 ```
 
-> Na primeira vez rode `go mod tidy` dentro de `services/events/` para gerar o
-> `go.sum`. Sem ele o `docker build` falha no `go mod download`.
+### Testes
+
+```bash
+make test   # go test ./... (domínio, handlers com store falso, client ViaCEP, config)
+```
+
+### Variáveis de ambiente
+
+| Variável         | Padrão                   | Descrição                          |
+|------------------|--------------------------|------------------------------------|
+| `DATABASE_URL`   | — (obrigatória)          | DSN do Postgres                    |
+| `HTTP_PORT`      | `8080`                   | Porta HTTP                         |
+| `VIACEP_URL`     | `https://viacep.com.br`  | URL base da API externa            |
+| `VIACEP_TIMEOUT` | `5s`                     | Timeout das chamadas ao ViaCEP     |
+| `LOG_LEVEL`      | `info`                   | Nível de log                       |
 
 ## Endpoints
 
@@ -93,6 +106,24 @@ Base: `/api/v1`
 | POST   | `/api/v1/events/{id}/publish` | `draft` → `published`                  |
 | POST   | `/api/v1/events/{id}/cancel`  | → `cancelled`                          |
 | DELETE | `/api/v1/events/{id}`  | Remove o evento                               |
+| GET    | `/api/v1/addresses/{cep}` | Consulta endereço no ViaCEP (API externa)  |
+
+### API externa (ViaCEP)
+
+`internal/clients/viacep` consulta `https://viacep.com.br` com `context`, timeout
+(`VIACEP_TIMEOUT`, padrão 5s), `defer resp.Body.Close()` e checagem de
+`StatusCode`. A URL vem de `VIACEP_URL`. Erro de negócio e de infra são distintos:
+
+| Situação                              | Tipo     | HTTP |
+|---------------------------------------|----------|------|
+| CEP com formato inválido              | negócio  | 400  |
+| CEP inexistente                       | negócio  | 404  |
+| ViaCEP fora do ar / resposta inválida | infra    | 502  |
+| ViaCEP demorou além do timeout        | infra    | 504  |
+
+```bash
+curl http://localhost:8080/api/v1/addresses/01001000
+```
 
 ### Exemplo
 
@@ -146,6 +177,7 @@ Todas as falhas usam o mesmo envelope, com o `request_id` para cruzar com os log
 | 409    | transição de status não permitida             |
 | 422    | payload bem formado mas inválido              |
 | 500    | erro inesperado (detalhe só no log)           |
+| 502/504| serviço externo (ViaCEP) fora do ar / timeout |
 
 ## Observabilidade
 
@@ -207,6 +239,7 @@ ticketing/
     ├── go.mod
     ├── cmd/api/main.go               # bootstrap + graceful shutdown
     ├── internal/
+    │   ├── clients/viacep/           # client da API externa (ViaCEP)
     │   ├── config/                   # configuração por env
     │   ├── domain/                   # entidade, regras e validação
     │   ├── observability/            # logger JSON + contexto

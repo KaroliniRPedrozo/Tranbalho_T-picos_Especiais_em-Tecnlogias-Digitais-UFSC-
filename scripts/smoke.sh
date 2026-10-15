@@ -48,6 +48,11 @@ step "Erro 404 esperado"
 curl -sS -o /dev/null -w "status=%{http_code}\n" \
   "$BASE/api/v1/events/00000000-0000-0000-0000-000000000000"
 
+step "API externa: consulta de CEP (ViaCEP)"
+curl -fsS "$BASE/api/v1/addresses/01001000" | jq .
+curl -sS -o /dev/null -w "cep invalido status=%{http_code}\n" "$BASE/api/v1/addresses/123"
+curl -sS -o /dev/null -w "cep inexistente status=%{http_code}\n" "$BASE/api/v1/addresses/88900000"
+
 step "Cancelando e removendo"
 curl -fsS -X POST "$BASE/api/v1/events/$ID/cancel" | jq '{id, status}'
 curl -sS -o /dev/null -w "delete status=%{http_code}\n" -X DELETE "$BASE/api/v1/events/$ID"
