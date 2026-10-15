@@ -30,6 +30,8 @@ services:
       APP_ENV: development
       HTTP_PORT: "8080"
       LOG_LEVEL: info
+      VIACEP_URL: https://viacep.com.br
+      VIACEP_TIMEOUT: 5s
       DATABASE_URL: postgres://events:events@events-db:5432/eventsdb?sslmode=disable
     ports:
       - "8080:8080"

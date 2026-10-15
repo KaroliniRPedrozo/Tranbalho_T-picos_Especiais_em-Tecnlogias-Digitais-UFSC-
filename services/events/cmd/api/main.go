@@ -10,11 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/seuusuario/ticketing/services/events/internal/config"
-	"github.com/seuusuario/ticketing/services/events/internal/observability"
-	"github.com/seuusuario/ticketing/services/events/internal/storage"
-	"github.com/seuusuario/ticketing/services/events/internal/transport/rest"
-	"github.com/seuusuario/ticketing/services/events/migrations"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/clients/viacep"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/config"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/observability"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/storage"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/transport/rest"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/migrations"
 )
 
 // version e sobrescrito no build via -ldflags.
@@ -62,6 +63,7 @@ func run() error {
 	handler := rest.NewRouter(rest.RouterDeps{
 		Logger:      log,
 		EventStore:  repo,
+		Addresses:   viacep.New(cfg.ViaCEPURL, cfg.ViaCEPTimeout),
 		Pinger:      repo,
 		ServiceName: cfg.ServiceName,
 		Version:     version,

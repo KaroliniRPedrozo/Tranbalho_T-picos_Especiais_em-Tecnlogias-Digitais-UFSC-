@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/seuusuario/ticketing/services/events/internal/observability"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/observability"
 )
 
 // ErrorBody e o envelope unico de erro da API. Um formato so facilita a vida

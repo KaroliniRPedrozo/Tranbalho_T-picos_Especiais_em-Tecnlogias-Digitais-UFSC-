@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/seuusuario/ticketing/services/events/internal/domain"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/domain"
 )
 
 // EventRepository isola o SQL do resto da aplicacao. Os handlers so conhecem

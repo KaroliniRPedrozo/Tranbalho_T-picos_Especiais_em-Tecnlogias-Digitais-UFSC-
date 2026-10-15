@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/seuusuario/ticketing/services/events/internal/observability"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/observability"
 )
 
 const headerRequestID = "X-Request-ID"

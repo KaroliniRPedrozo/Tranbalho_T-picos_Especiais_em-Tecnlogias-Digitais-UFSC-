@@ -12,8 +12,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/seuusuario/ticketing/services/events/internal/domain"
-	"github.com/seuusuario/ticketing/services/events/internal/observability"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/domain"
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/observability"
 )
 
 // EventStore e a dependencia que o handler precisa. Declarar a interface aqui

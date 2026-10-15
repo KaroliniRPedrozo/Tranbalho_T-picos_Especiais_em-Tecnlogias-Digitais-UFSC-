@@ -17,6 +17,8 @@ type Config struct {
 	LogLevel        string
 	ShutdownTimeout time.Duration
 	DBConnectRetry  int
+	ViaCEPURL       string
+	ViaCEPTimeout   time.Duration
 }
 
 func Load() (Config, error) {
@@ -28,6 +30,8 @@ func Load() (Config, error) {
 		LogLevel:        getenv("LOG_LEVEL", "info"),
 		ShutdownTimeout: getduration("SHUTDOWN_TIMEOUT", 10*time.Second),
 		DBConnectRetry:  getint("DB_CONNECT_RETRY", 10),
+		ViaCEPURL:       getenv("VIACEP_URL", "https://viacep.com.br"),
+		ViaCEPTimeout:   getduration("VIACEP_TIMEOUT", 5*time.Second),
 	}
 
 	if cfg.DatabaseURL == "" {

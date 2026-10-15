@@ -4,7 +4,7 @@ package events.v1;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/seuusuario/ticketing/gen/events/v1;eventsv1";
+option go_package = "github.com/KaroliniRPedrozo/ticketing/gen/events/v1;eventsv1";
 
 // EventsService e a face interna do events-service. O tickets-service vai
 // chamar GetEvent antes de reservar ingressos, para validar status e

@@ -59,10 +59,8 @@ func (e *Event) CanPublish() error {
 	return nil
 }
 
+// CanCancel permite cancelar de qualquer estado; cancelar de novo e idempotente.
 func (e *Event) CanCancel() error {
-	if e.Status == StatusCancelled {
-		return nil // idempotente
-	}
 	return nil
 }
 

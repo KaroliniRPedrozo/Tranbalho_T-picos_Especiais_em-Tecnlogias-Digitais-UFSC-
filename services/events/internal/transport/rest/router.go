@@ -17,6 +17,7 @@ type Pinger interface {
 type RouterDeps struct {
 	Logger      *slog.Logger
 	EventStore  EventStore
+	Addresses   AddressLookup
 	Pinger      Pinger
 	ServiceName string
 	Version     string
@@ -64,6 +65,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Post("/{id}/publish", h.Publish)
 		r.Post("/{id}/cancel", h.Cancel)
 	})
+
+	ah := NewAddressHandler(deps.Addresses)
+	r.Get("/api/v1/addresses/{cep}", ah.Get)
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "route_not_found", "rota nao existe", nil)
