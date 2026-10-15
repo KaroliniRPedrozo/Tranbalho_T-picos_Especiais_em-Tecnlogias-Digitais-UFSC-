@@ -157,8 +157,7 @@ while true; do
     6) cancel_event ;;
     7) delete_event ;;
     8) lookup_cep ;;
-    9) show_errors ;;
-    0|q|Q) printf "Ate mais.\n"; exit 0 ;;
+    9) show_errors ;;    0|q|Q) printf "Ate mais.\n"; exit 0 ;;
     *) printf "%sOpcao invalida.%s\n" "$YELLOW" "$RESET" ;;
   esac
   printf "\n"
