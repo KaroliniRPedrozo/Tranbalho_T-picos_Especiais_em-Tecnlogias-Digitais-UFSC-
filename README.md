@@ -8,7 +8,7 @@ própria em PostgreSQL, containerização e logs estruturados.
 
 ### Hoje (Apresentação I)
 
-```
+```text
    cliente externo
         │ REST/JSON
         ▼
@@ -20,7 +20,7 @@ própria em PostgreSQL, containerização e logs estruturados.
 
 ### Planejado (Apresentação II)
 
-```
+```text
    cliente externo
         │ REST/JSON
         ▼
@@ -39,7 +39,7 @@ troca passa pelo contrato gRPC definido em `proto/`.
 ## Stack
 
 | Camada          | Escolha                              |
-|-----------------|--------------------------------------|
+| --------------- | ------------------------------------ |
 | Linguagem       | Go 1.23                              |
 | Roteamento HTTP | `net/http` + `chi/v5`                |
 | Banco           | PostgreSQL 16 + `pgx/v5` (pool)      |
@@ -83,30 +83,30 @@ make test   # go test ./... (domínio, handlers com store falso, client ViaCEP, 
 
 ### Variáveis de ambiente
 
-| Variável         | Padrão                   | Descrição                          |
-|------------------|--------------------------|------------------------------------|
-| `DATABASE_URL`   | — (obrigatória)          | DSN do Postgres                    |
-| `HTTP_PORT`      | `8080`                   | Porta HTTP                         |
-| `VIACEP_URL`     | `https://viacep.com.br`  | URL base da API externa            |
-| `VIACEP_TIMEOUT` | `5s`                     | Timeout das chamadas ao ViaCEP     |
-| `LOG_LEVEL`      | `info`                   | Nível de log                       |
+| Variável         | Padrão                  | Descrição                      |
+| ---------------- | ----------------------- | ------------------------------ |
+| `DATABASE_URL`   | — (obrigatória)         | DSN do Postgres                |
+| `HTTP_PORT`      | `8080`                  | Porta HTTP                     |
+| `VIACEP_URL`     | `https://viacep.com.br` | URL base da API externa        |
+| `VIACEP_TIMEOUT` | `5s`                    | Timeout das chamadas ao ViaCEP |
+| `LOG_LEVEL`      | `info`                  | Nível de log                   |
 
 ## Endpoints
 
 Base: `/api/v1`
 
-| Método | Rota                   | Descrição                                    |
-|--------|------------------------|----------------------------------------------|
-| GET    | `/healthz`             | Liveness — processo de pé                     |
-| GET    | `/readyz`              | Readiness — inclui ping no banco              |
-| POST   | `/api/v1/events`       | Cria evento (nasce como `draft`)              |
-| GET    | `/api/v1/events`       | Lista com filtros `city`, `status` e paginação |
-| GET    | `/api/v1/events/{id}`  | Busca por id                                  |
-| PUT    | `/api/v1/events/{id}`  | Atualiza dados do evento                      |
-| POST   | `/api/v1/events/{id}/publish` | `draft` → `published`                  |
-| POST   | `/api/v1/events/{id}/cancel`  | → `cancelled`                          |
-| DELETE | `/api/v1/events/{id}`  | Remove o evento                               |
-| GET    | `/api/v1/addresses/{cep}` | Consulta endereço no ViaCEP (API externa)  |
+| Método | Rota                          | Descrição                                      |
+| ------ | ----------------------------- | ---------------------------------------------- |
+| GET    | `/healthz`                    | Liveness — processo de pé                      |
+| GET    | `/readyz`                     | Readiness — inclui ping no banco               |
+| POST   | `/api/v1/events`              | Cria evento (nasce como `draft`)               |
+| GET    | `/api/v1/events`              | Lista com filtros `city`, `status` e paginação |
+| GET    | `/api/v1/events/{id}`         | Busca por id                                   |
+| PUT    | `/api/v1/events/{id}`         | Atualiza dados do evento                       |
+| POST   | `/api/v1/events/{id}/publish` | `draft` → `published`                          |
+| POST   | `/api/v1/events/{id}/cancel`  | → `cancelled`                                  |
+| DELETE | `/api/v1/events/{id}`         | Remove o evento                                |
+| GET    | `/api/v1/addresses/{cep}`     | Consulta endereço no ViaCEP (API externa)      |
 
 ### API externa (ViaCEP)
 
@@ -114,12 +114,12 @@ Base: `/api/v1`
 (`VIACEP_TIMEOUT`, padrão 5s), `defer resp.Body.Close()` e checagem de
 `StatusCode`. A URL vem de `VIACEP_URL`. Erro de negócio e de infra são distintos:
 
-| Situação                              | Tipo     | HTTP |
-|---------------------------------------|----------|------|
-| CEP com formato inválido              | negócio  | 400  |
-| CEP inexistente                       | negócio  | 404  |
-| ViaCEP fora do ar / resposta inválida | infra    | 502  |
-| ViaCEP demorou além do timeout        | infra    | 504  |
+| Situação                              | Tipo    | HTTP |
+| ------------------------------------- | ------- | ---- |
+| CEP com formato inválido              | negócio | 400  |
+| CEP inexistente                       | negócio | 404  |
+| ViaCEP fora do ar / resposta inválida | infra   | 502  |
+| ViaCEP demorou além do timeout        | infra   | 504  |
 
 ```bash
 curl http://localhost:8080/api/v1/addresses/01001000
@@ -170,14 +170,14 @@ Todas as falhas usam o mesmo envelope, com o `request_id` para cruzar com os log
 }
 ```
 
-| Status | Quando                                        |
-|--------|-----------------------------------------------|
-| 400    | id mal formado, query string inválida, JSON quebrado |
-| 404    | evento inexistente ou rota desconhecida       |
-| 409    | transição de status não permitida             |
-| 422    | payload bem formado mas inválido              |
-| 500    | erro inesperado (detalhe só no log)           |
-| 502/504| serviço externo (ViaCEP) fora do ar / timeout |
+| Status  | Quando                                               |
+| ------- | ---------------------------------------------------- |
+| 400     | id mal formado, query string inválida, JSON quebrado |
+| 404     | evento inexistente ou rota desconhecida              |
+| 409     | transição de status não permitida                    |
+| 422     | payload bem formado mas inválido                     |
+| 500     | erro inesperado (detalhe só no log)                  |
+| 502/504 | serviço externo (ViaCEP) fora do ar / timeout        |
 
 ## Observabilidade
 
@@ -206,15 +206,15 @@ docker compose logs -f events-service | jq 'select(.status >= 400)'
 
 ## Atendimento aos requisitos
 
-| # | Requisito                        | Situação                                                     |
-|---|----------------------------------|--------------------------------------------------------------|
-| 1 | 2–3 microsserviços em Go         | 1 de 3 entregue; contratos dos demais já em `proto/`          |
-| 3 | Comunicação entre si e externa   | Externa pronta; interna planejada na fase 2                   |
-| 4 | Comunicação externa via REST     | Pronto — `chi`, JSON, verbos e status codes corretos          |
-| 5 | Comunicação interna via gRPC     | `proto/events/v1/events.proto` definido; implementação na fase 2 |
-| 6 | Persistência própria             | Pronto — Postgres dedicado, migrations versionadas            |
-| 7 | Docker Compose                   | Pronto — build multi-stage, healthchecks, volume nomeado      |
-| 8 | Observabilidade                  | Pronto — slog JSON, request id, healthz/readyz                |
+| #   | Requisito                      | Situação                                                         |
+| --- | ------------------------------ | ---------------------------------------------------------------- |
+| 1   | 2–3 microsserviços em Go       | 1 de 3 entregue; contratos dos demais já em `proto/`             |
+| 3   | Comunicação entre si e externa | Externa pronta; interna planejada na fase 2                      |
+| 4   | Comunicação externa via REST   | Pronto — `chi`, JSON, verbos e status codes corretos             |
+| 5   | Comunicação interna via gRPC   | `proto/events/v1/events.proto` definido; implementação na fase 2 |
+| 6   | Persistência própria           | Pronto — Postgres dedicado, migrations versionadas               |
+| 7   | Docker Compose                 | Pronto — build multi-stage, healthchecks, volume nomeado         |
+| 8   | Observabilidade                | Pronto — slog JSON, request id, healthz/readyz                   |
 
 ## Próximos passos (Apresentação II)
 
@@ -228,7 +228,7 @@ docker compose logs -f events-service | jq 'select(.status >= 400)'
 
 ## Estrutura
 
-```
+```text
 ticketing/
 ├── docker-compose.yml
 ├── Makefile
