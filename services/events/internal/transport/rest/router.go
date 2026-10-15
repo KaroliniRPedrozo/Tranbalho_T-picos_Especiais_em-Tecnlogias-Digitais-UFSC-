@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/transport/apidocs"
 )
 
 // Pinger e implementado pelo repositorio; usado no /readyz.
@@ -55,6 +57,10 @@ func NewRouter(deps RouterDeps) http.Handler {
 		}
 		writeJSON(w, r, http.StatusOK, map[string]string{"status": "ready"})
 	})
+
+	// Documentacao: Swagger UI em /docs e a spec OpenAPI em /openapi.yaml.
+	r.Get("/openapi.yaml", apidocs.OpenAPISpec)
+	r.Get("/docs", apidocs.SwaggerUI)
 
 	// Rotas REST de eventos (CRUD + publicar/cancelar).
 	h := NewEventHandler(deps.EventStore)

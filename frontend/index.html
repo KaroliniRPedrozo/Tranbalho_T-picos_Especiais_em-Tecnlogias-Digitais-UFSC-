@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eventos</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <h1>🎟️ Gestão de Eventos</h1>
+  <nav><a href="/docs" target="_blank">Swagger</a><a href="/healthz" target="_blank">Health</a></nav>
+</header>
+
+<main>
+  <section>
+    <h2>Eventos <span id="total" style="color:var(--muted);font-weight:normal"></span></h2>
+    <div class="row">
+      <div><label>Cidade</label><input id="fCity" placeholder="ex: Florianópolis"></div>
+      <div><label>Status</label>
+        <select id="fStatus">
+          <option value="">Todos</option><option value="draft">Rascunho</option>
+          <option value="published">Publicado</option><option value="cancelled">Cancelado</option>
+        </select></div>
+      <button id="btnFilter">Filtrar</button>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <div class="side">
+    <section>
+      <h2 id="formTitle">Novo evento</h2>
+      <form id="form">
+        <label>Nome *</label><input name="name" required maxlength="160">
+        <label>Descrição</label><textarea name="description" rows="2"></textarea>
+        <label>Local *</label><input name="venue" required>
+        <label>Cidade *</label><input name="city" required>
+        <label>Data e hora * (futura)</label><input name="starts_at" type="datetime-local" required>
+        <div class="grid2">
+          <div><label>Capacidade *</label><input name="capacity" type="number" min="1" required></div>
+          <div><label>Preço (R$)</label><input name="price" type="number" min="0" step="0.01" value="0"></div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button type="submit" id="btnSave">Criar</button>
+          <button type="button" class="ghost" id="btnReset">Limpar</button>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <h2>Consulta de CEP</h2>
+      <div class="row">
+        <div><input id="cep" placeholder="01001000" maxlength="9"></div>
+        <button id="btnCep">Buscar</button>
+      </div>
+      <div id="cepOut"></div>
+    </section>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script src="js/api.js"></script>
+<script src="js/events.js"></script>
+<script src="js/cep.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

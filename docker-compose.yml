@@ -48,6 +48,20 @@ services:
     networks:
       - ticketing
 
+  # Front-end estatico (nginx). Serve a pagina e encaminha /api, /docs e
+  # /healthz para o events-service.
+  frontend:
+    build:
+      context: ./frontend
+    container_name: ticketing-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - events-service
+    restart: unless-stopped
+    networks:
+      - ticketing
+
   # --- Fase 2 (gRPC) --------------------------------------------------------
   # tickets-db / tickets-service e payments-service entram aqui. O
   # events-service vai expor tambem uma porta gRPC interna (nao publicada no

@@ -1,0 +1,260 @@
+openapi: 3.0.3
+info:
+  title: Events API
+  version: 1.0.0
+  description: Microsservico de eventos (CRUD, publicar/cancelar) e consulta de CEP via ViaCEP.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: events
+  - name: addresses
+  - name: health
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      summary: Liveness
+      responses:
+        "200":
+          description: Processo no ar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string }
+                  version: { type: string }
+  /readyz:
+    get:
+      tags: [health]
+      summary: Readiness (verifica o banco)
+      responses:
+        "200":
+          description: Pronto
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ready }
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/events:
+    get:
+      tags: [events]
+      summary: Lista eventos
+      parameters:
+        - { name: city, in: query, schema: { type: string } }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/Status" }
+        - name: limit
+          in: query
+          description: Maximo 100
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: Pagina de eventos
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Page" }
+        "400":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [events]
+      summary: Cria um evento (nasce como draft)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventInput" }
+      responses:
+        "201":
+          description: Criado
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+  /api/v1/events/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/EventId" }
+    get:
+      tags: [events]
+      summary: Busca um evento
+      responses:
+        "200":
+          description: Evento
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [events]
+      summary: Atualiza um evento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventInput" }
+      responses:
+        "200":
+          description: Atualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [events]
+      summary: Remove um evento
+      responses:
+        "204":
+          description: Removido
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/events/{id}/publish:
+    post:
+      tags: [events]
+      summary: Publica um evento (so com data futura; idempotente)
+      parameters:
+        - { $ref: "#/components/parameters/EventId" }
+      responses:
+        "200":
+          description: Publicado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/events/{id}/cancel:
+    post:
+      tags: [events]
+      summary: Cancela um evento (idempotente)
+      parameters:
+        - { $ref: "#/components/parameters/EventId" }
+      responses:
+        "200":
+          description: Cancelado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/addresses/{cep}:
+    get:
+      tags: [addresses]
+      summary: Consulta endereco por CEP (ViaCEP)
+      parameters:
+        - name: cep
+          in: path
+          required: true
+          schema: { type: string, example: "01001000" }
+      responses:
+        "200":
+          description: Endereco
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Address" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+components:
+  parameters:
+    EventId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Error:
+      description: Erro
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorBody" }
+  schemas:
+    Status:
+      type: string
+      enum: [draft, published, cancelled]
+    EventInput:
+      type: object
+      required: [name, venue, city, starts_at, capacity]
+      properties:
+        name: { type: string, maxLength: 160 }
+        description: { type: string, maxLength: 2000 }
+        venue: { type: string }
+        city: { type: string }
+        starts_at:
+          type: string
+          format: date-time
+          description: RFC3339, deve ser futura
+          example: "2026-11-20T20:00:00Z"
+        capacity: { type: integer, format: int32, minimum: 1 }
+        price_cents: { type: integer, format: int64, minimum: 0 }
+    Event:
+      allOf:
+        - $ref: "#/components/schemas/EventInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            status: { $ref: "#/components/schemas/Status" }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    Page:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Event" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+    Address:
+      type: object
+      properties:
+        cep: { type: string }
+        street: { type: string }
+        neighborhood: { type: string }
+        city: { type: string }
+        state: { type: string }
+    ErrorBody:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            fields:
+              type: object
+              additionalProperties: { type: string }
+            request_id: { type: string }
