@@ -1,4 +1,4 @@
-.PHONY: up down logs rebuild tidy run test smoke clean
+.PHONY: up down logs rebuild tidy run test smoke demo clean
 
 up:
 	docker compose up --build -d
@@ -30,3 +30,6 @@ test:
 
 smoke:
 	./scripts/smoke.sh
+
+demo:
+	./scripts/demo.sh
