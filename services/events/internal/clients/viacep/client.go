@@ -33,13 +33,15 @@ type Address struct {
 // apontar para um servidor de teste.
 type Client struct {
 	baseURL string
+	timeout time.Duration
 	http    *http.Client
 }
 
 func New(baseURL string, timeout time.Duration) *Client {
 	return &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
-		http:    &http.Client{Timeout: timeout},
+		timeout: timeout,
+		http:    &http.Client{},
 	}
 }
 
@@ -63,13 +65,16 @@ type response struct {
 	Erro       any    `json:"erro"` // true (bool) ou "true" (string) quando nao existe
 }
 
-// Lookup consulta o CEP. O contexto limita o tempo total da chamada, junto com
-// o timeout do http.Client.
+// Lookup consulta o CEP. O timeout vale para a chamada inteira (conexao,
+// resposta e leitura do corpo) e herda o cancelamento do contexto recebido.
 func (c *Client) Lookup(ctx context.Context, rawCEP string) (Address, error) {
 	cep, err := NormalizeCEP(rawCEP)
 	if err != nil {
 		return Address{}, err
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/ws/"+cep+"/json/", nil)
 	if err != nil {

@@ -71,6 +71,7 @@ func TestLookup_ErrosDeInfra(t *testing.T) {
 		c := newServer(t, func(w http.ResponseWriter, r *http.Request) { time.Sleep(time.Second) })
 		_, err := c.Lookup(context.Background(), "88900000")
 		assert.ErrorIs(t, err, ErrUnavailable)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
 	})
 	t.Run("contexto cancelado", func(t *testing.T) {
 		c := newServer(t, func(w http.ResponseWriter, r *http.Request) {})
