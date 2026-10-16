@@ -21,6 +21,9 @@ import (
 const validID = "11111111-1111-1111-1111-111111111111"
 
 // fakeStore implementa EventStore em memoria para os testes de handler.
+// Como o handler depende de uma INTERFACE (e nao do Postgres), conseguimos
+// testar toda a camada HTTP sem banco: o campo err simula uma falha e o campo
+// event e o que o "banco" devolve.
 type fakeStore struct {
 	event domain.Event
 	err   error
@@ -54,8 +57,11 @@ type fakePinger struct{ err error }
 
 func (f fakePinger) Ping(context.Context) error { return f.err }
 
+// do monta o roteador real com as dependencias falsas e dispara uma requisicao
+// HTTP "de mentira" (httptest), sem abrir porta de rede. Devolve o recorder
+// para os testes conferirem status, cabecalhos e corpo.
 func do(t *testing.T, store *fakeStore, lookup AddressLookup, method, path, body string) *httptest.ResponseRecorder {
-	t.Helper()
+	t.Helper() // em caso de falha, aponta a linha do teste e nao a deste helper
 	if lookup == nil {
 		lookup = fakeLookup{}
 	}
@@ -83,6 +89,9 @@ func validBody() string {
 		time.Now().Add(48*time.Hour).UTC().Format(time.RFC3339) + `","capacity":100,"price_cents":5000}`
 }
 
+// TestCreate cobre os caminhos do POST /events: o feliz (201) e cada tipo de
+// erro, mostrando a diferenca entre 400 (formato), 422 (regra) e 500 (infra).
+// t.Run cria um sub-teste por cenario, que aparece separado na saida.
 func TestCreate(t *testing.T) {
 	t.Run("201 com Location", func(t *testing.T) {
 		rec := do(t, &fakeStore{}, nil, http.MethodPost, "/api/v1/events", validBody())
@@ -167,6 +176,9 @@ func TestTransitions(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
+// TestAddress e um teste "orientado a tabela" (table-driven), o padrao do Go:
+// cada linha da tabela e um cenario (erro simulado -> status esperado), e o
+// mesmo laco roda todos. Para testar um caso novo basta adicionar uma linha.
 func TestAddress(t *testing.T) {
 	cases := []struct {
 		nome   string

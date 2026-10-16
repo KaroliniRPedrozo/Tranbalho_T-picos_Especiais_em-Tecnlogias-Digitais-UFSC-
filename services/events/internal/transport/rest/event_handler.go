@@ -48,22 +48,29 @@ const (
 
 // Create trata POST /events: valida o corpo, grava e responde 201 + Location.
 func (h *EventHandler) Create(w http.ResponseWriter, r *http.Request) {
+	// 1. Le e valida o JSON. Se estiver errado, decodeInput ja respondeu
+	// (400 ou 422) e aqui so paramos (padrao "return cedo").
 	in, ok := decodeInput(w, r)
 	if !ok {
 		return
 	}
 
+	// 2. Grava no banco. r.Context() leva o cancelamento: se o cliente
+	// desistir da requisicao, a consulta ao banco tambem e cancelada.
 	event, err := h.store.Create(r.Context(), in)
 	if err != nil {
 		h.fail(w, r, err)
 		return
 	}
 
+	// 3. Log de negocio (alem do log de acesso do middleware).
 	observability.LoggerFrom(r.Context()).Info("evento criado",
 		slog.String("event_id", event.ID),
 		slog.String("event_name", event.Name),
 	)
 
+	// 4. 201 Created + cabecalho Location com o endereco do novo recurso:
+	// e o que a convencao REST pede para criacao.
 	w.Header().Set("Location", "/api/v1/events/"+event.ID)
 	writeJSON(w, r, http.StatusCreated, event)
 }
@@ -123,11 +130,14 @@ func (h *EventHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get trata GET /events/{id}.
 func (h *EventHandler) Get(w http.ResponseWriter, r *http.Request) {
+	// Valida o id antes de ir ao banco: id mal formado e erro do cliente (400),
+	// nao precisa gastar uma consulta para descobrir.
 	id, ok := eventID(w, r)
 	if !ok {
 		return
 	}
 
+	// ErrNotFound vira 404 dentro de h.fail.
 	event, err := h.store.GetByID(r.Context(), id)
 	if err != nil {
 		h.fail(w, r, err)
@@ -176,12 +186,15 @@ func (h *EventHandler) transition(w http.ResponseWriter, r *http.Request, target
 		return
 	}
 
+	// 1. Busca o estado atual: a regra depende dele (ex: cancelado nao publica).
 	current, err := h.store.GetByID(r.Context(), id)
 	if err != nil {
 		h.fail(w, r, err)
 		return
 	}
 
+	// 2. Pergunta ao dominio se a transicao e permitida. A regra mora no
+	// domain (Event.CanPublish/CanCancel), nao aqui: o handler so a aplica.
 	var ruleErr error
 	switch target {
 	case domain.StatusPublished:
@@ -189,11 +202,13 @@ func (h *EventHandler) transition(w http.ResponseWriter, r *http.Request, target
 	case domain.StatusCancelled:
 		ruleErr = current.CanCancel()
 	}
+	// 409 Conflict: o pedido e valido, mas conflita com o estado atual do recurso.
 	if ruleErr != nil {
 		writeError(w, r, http.StatusConflict, "invalid_transition", ruleErr.Error(), nil)
 		return
 	}
 
+	// 3. Permitido: grava o novo status.
 	event, err := h.store.UpdateStatus(r.Context(), id, target)
 	if err != nil {
 		h.fail(w, r, err)
@@ -222,12 +237,16 @@ func (h *EventHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	observability.LoggerFrom(r.Context()).Info("evento removido", slog.String("event_id", id))
+	// 204 No Content: deu certo e nao ha nada a devolver no corpo.
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // fail traduz erro de dominio em status HTTP. Erro inesperado vira 500 e so o
 // log guarda o detalhe tecnico, para nao vazar interno na resposta.
 func (h *EventHandler) fail(w http.ResponseWriter, r *http.Request, err error) {
+	// errors.Is percorre a cadeia de erros embrulhados (fmt.Errorf("%w")) e
+	// procura o erro de dominio. E o ponto central da traducao
+	// "erro de negocio -> status HTTP".
 	switch {
 	case errors.Is(err, domain.ErrNotFound):
 		writeError(w, r, http.StatusNotFound, "not_found", "evento nao encontrado", nil)
@@ -252,12 +271,17 @@ func eventID(w http.ResponseWriter, r *http.Request) (string, bool) {
 // decodeInput le e valida o JSON do corpo. Em caso de erro ja responde ao
 // cliente (400 ou 422) e devolve ok=false.
 func decodeInput(w http.ResponseWriter, r *http.Request) (domain.EventInput, bool) {
-	// Limita o tamanho do corpo e recusa campos desconhecidos.
+	// Limita o tamanho do corpo (protege contra envio de arquivos enormes) e
+	// recusa campos desconhecidos (pega erro de digitacao do cliente, como
+	// "nmae" em vez de "name", em vez de ignorar em silencio).
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 
+	// Decode preenche a struct a partir do JSON. Falhou = 400 (formato errado).
+	// A diferenca para o 422 mais abaixo: aqui o JSON nem e legivel; la ele e
+	// legivel, mas viola uma regra de negocio.
 	var in domain.EventInput
 	if err := dec.Decode(&in); err != nil {
 		msg := "corpo da requisicao invalido: " + err.Error()

@@ -29,9 +29,14 @@ type RouterDeps struct {
 // NewRouter monta a superficie REST publica do servico. Esta e a unica porta
 // exposta para fora do cluster; a conversa entre servicos sera gRPC.
 func NewRouter(deps RouterDeps) http.Handler {
+	// chi e o roteador: liga cada endereco (URL + metodo) a uma funcao.
 	r := chi.NewRouter()
 
-	// Middlewares, na ordem: id da requisicao, log de acesso, recuperacao de panic.
+	// Middlewares sao funcoes que rodam em TODA requisicao, antes do handler.
+	// Ordem importa: o id nasce primeiro para o log e o panic ja o usarem.
+	//   1. RequestID: cria/le o X-Request-ID
+	//   2. StructuredLogger: escreve uma linha de log por requisicao
+	//   3. Recoverer: se algo der panic, responde 500 em vez de derrubar o servico
 	r.Use(RequestID)
 	r.Use(StructuredLogger(deps.Logger))
 	r.Use(Recoverer)
@@ -63,23 +68,29 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/docs", apidocs.SwaggerUI)
 
 	// Rotas REST de eventos (CRUD + publicar/cancelar).
+	// O handler recebe o repositorio (EventStore) pronto: o router nao sabe
+	// se por tras ha Postgres ou um fake de teste.
 	h := NewEventHandler(deps.EventStore)
 
+	// "/api/v1" -> o v1 permite lancar uma v2 no futuro sem quebrar quem usa a v1.
+	// {id} e um parametro de URL, lido no handler com chi.URLParam.
 	r.Route("/api/v1/events", func(r chi.Router) {
-		r.Post("/", h.Create)
-		r.Get("/", h.List)
-		r.Get("/{id}", h.Get)
-		r.Put("/{id}", h.Update)
-		r.Delete("/{id}", h.Delete)
-		r.Post("/{id}/publish", h.Publish)
-		r.Post("/{id}/cancel", h.Cancel)
+		r.Post("/", h.Create)              // C - cria (201)
+		r.Get("/", h.List)                 // R - lista com filtros e paginacao
+		r.Get("/{id}", h.Get)              // R - busca um
+		r.Put("/{id}", h.Update)           // U - atualiza
+		r.Delete("/{id}", h.Delete)        // D - remove (204)
+		r.Post("/{id}/publish", h.Publish) // transicao: draft -> published
+		r.Post("/{id}/cancel", h.Cancel)   // transicao: qualquer -> cancelled
 	})
 
 	// Rota de consulta de CEP (usa a API externa ViaCEP).
 	ah := NewAddressHandler(deps.Addresses)
 	r.Get("/api/v1/addresses/{cep}", ah.Get)
 
-	// Respostas padrao para rota inexistente e metodo nao permitido.
+	// Respostas padrao para rota inexistente (404) e metodo errado (405, ex:
+	// POST em /healthz). Sem isso o chi devolveria texto puro, fora do nosso
+	// formato JSON de erro.
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "route_not_found", "rota nao existe", nil)
 	})

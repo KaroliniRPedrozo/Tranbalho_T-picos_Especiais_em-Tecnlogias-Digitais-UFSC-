@@ -16,6 +16,9 @@ import (
 	"github.com/KaroliniRPedrozo/ticketing/services/events/internal/observability"
 )
 
+// TestReadyz mostra a diferenca entre liveness e readiness: o /healthz diz
+// "o processo esta vivo", o /readyz diz "posso receber trafego" (o banco
+// responde?). Aqui o Pinger falso simula o banco no ar e fora do ar.
 func TestReadyz(t *testing.T) {
 	novo := func(p Pinger) http.Handler {
 		return NewRouter(RouterDeps{
@@ -128,6 +131,10 @@ func TestDocs(t *testing.T) {
 
 // Garante que o Swagger nao fica desatualizado: toda rota do roteador precisa
 // estar no openapi.yaml e toda rota do openapi.yaml precisa existir no roteador.
+//
+// Como funciona: chi.Walk percorre o roteador e lista as rotas reais; uma
+// expressao regular le o openapi.yaml e lista as rotas documentadas; depois o
+// teste compara os dois conjuntos nos dois sentidos.
 func TestOpenAPI_BateComAsRotas(t *testing.T) {
 	spec, err := os.ReadFile("../apidocs/openapi.yaml")
 	require.NoError(t, err)
